@@ -95,6 +95,7 @@ func main() {
 	defer chain.Database.Close()
 
 	cli := CommandLine{chain}
+
 	cli.run()
 
 }

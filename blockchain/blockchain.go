@@ -32,6 +32,7 @@ func Init() *BlockChain {
 	var lastHash []byte
 
 	opts := badger.DefaultOptions(dbPath)
+	opts.Logger = nil
 
 	db, err := badger.Open(opts)
 	handle(err)
