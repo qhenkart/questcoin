@@ -2,16 +2,17 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"log"
 )
 
 // Block ...
 type Block struct {
-	Hash     []byte
-	Data     []byte
-	PrevHash []byte
-	Nonce    int
+	Hash         []byte
+	Transactions []*Transaction
+	PrevHash     []byte
+	Nonce        int
 }
 
 //// DeriveHash unused since we are deriving the hash in the  the PoW
@@ -21,9 +22,26 @@ type Block struct {
 //b.Hash = hash[:]
 //}
 
+// HashTransactions represent all transactions in a unique hash for PoW
+func (b *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
+
+	// add each transaction to the 2d slice
+	for _, tx := range b.Transactions {
+		txHashes = append(txHashes, tx.ID)
+	}
+
+	// concat all the bytes together and hash them
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+
+	return txHash[:]
+
+}
+
 // CreateBlock ...
-func CreateBlock(data string, prevHash []byte) *Block {
-	block := &Block{[]byte{}, []byte(data), prevHash, 0}
+func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
+	block := &Block{[]byte{}, txs, prevHash, 0}
 	pow := NewProof(block)
 	nonce, hash := pow.Run()
 
@@ -34,8 +52,8 @@ func CreateBlock(data string, prevHash []byte) *Block {
 }
 
 // Genesis ...
-func Genesis() *Block {
-	return CreateBlock("genesis", []byte{})
+func Genesis(coinbase *Transaction) *Block {
+	return CreateBlock([]*Transaction{coinbase}, []byte{})
 }
 
 // Serialize ...
