@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -40,6 +41,30 @@ func (w *Wallet) Address() []byte {
 	address := Base58Encode(fullHash)
 
 	return address
+}
+
+// ValidateAddress validates the validity of an address
+//
+// take an address string -> convert to hash by passing through base68 decoder --> Remove the version (first 2 characters), remove the pub key hash, so that the remaining is the checksum
+// -> the final checksum should be like 2bc6c767
+//
+// then take the pub key hash, attach a new constant to it and pass it through our checksum function to create a new checksum and compare it
+func ValidateAddress(address string) bool {
+	// get the pubkeyhash by decoding it back to base64
+	pubKeyHash := Base58Decode([]byte(address))
+	// remove the version and hash to get the check sum
+	actualChecksum := pubKeyHash[len(pubKeyHash)-checksumLength:]
+	// get the version digits
+	version := pubKeyHash[0]
+
+	// get just the pub key hash to rerun it through the checksum
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-checksumLength]
+
+	// create a new checksum
+	targetChecksum := Checksum(append([]byte{version}, pubKeyHash...))
+
+	// finally compare the provided checksum and the target
+	return bytes.Compare(actualChecksum, targetChecksum) == 0
 }
 
 // NewKeyPair creates a new public private keypair 10^77 possibilities
