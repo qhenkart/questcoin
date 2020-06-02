@@ -16,7 +16,7 @@ import (
 	"github.com/qhenkart/blockchain/wallet"
 )
 
-const miningReward = 100
+const miningReward = 20
 
 // Transaction transactions do not have any identifiable information or secrets because they are public. They are just a collection
 // of inputs and outputs and we can derive everything we need from those elements
@@ -49,22 +49,14 @@ func (tx *Transaction) Hash() []byte {
 	return hash[:]
 }
 
-// SetID creates a hash based on the bytes that represent the transaction
-func (tx *Transaction) SetID() {
-	var encoded bytes.Buffer
-	var hash [32]byte
-
-	encode := gob.NewEncoder(&encoded)
-	err := encode.Encode(tx)
-	handle(err)
-	hash = sha256.Sum256(encoded.Bytes())
-	tx.ID = hash[:]
-}
-
 // CoinbaseTx creates the first genesis transaction
 func CoinbaseTx(to, data string) *Transaction {
+	// create something random to put in the coinbase data
 	if data == "" {
-		data = fmt.Sprintf("Coins to %s", to)
+		randData := make([]byte, 24)
+		_, err := rand.Read(randData)
+		handle(err)
+		data = fmt.Sprintf("%x", randData)
 	}
 
 	// referencing no output so it is missing data
@@ -72,7 +64,7 @@ func CoinbaseTx(to, data string) *Transaction {
 	txout := NewTXOutput(miningReward, to)
 
 	tx := Transaction{nil, []TxInput{txin}, []TxOutput{*txout}}
-	tx.SetID()
+	tx.ID = tx.Hash()
 
 	return &tx
 }

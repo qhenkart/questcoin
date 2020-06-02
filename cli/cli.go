@@ -63,10 +63,11 @@ func (cli *CommandLine) createBlockChain(address string) {
 		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.Init(address)
-	chain.Database.Close()
+	defer chain.Database.Close()
 
 	UTXOSet := blockchain.UTXOSet{Blockchain: chain}
 	UTXOSet.Reindex()
+
 	fmt.Println("block chain created")
 }
 
@@ -130,7 +131,11 @@ func (cli *CommandLine) send(from, to string, amount int) {
 	defer chain.Database.Close()
 
 	tx := blockchain.NewTransaction(from, to, amount, &UTXOSet)
-	block := chain.AddBlock([]*blockchain.Transaction{tx})
+
+	// the person sending the transaction is also the person mining the new block. therefore a coinbase transaction gets created
+	cbTx := blockchain.CoinbaseTx(from, "")
+
+	block := chain.AddBlock([]*blockchain.Transaction{cbTx, tx})
 	UTXOSet.Update(block)
 	fmt.Printf("successfully transferred %d QuestCoins to %s", amount, to)
 }

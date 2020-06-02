@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/gob"
 	"log"
 )
@@ -15,27 +14,20 @@ type Block struct {
 	Nonce        int
 }
 
-//// DeriveHash unused since we are deriving the hash in the  the PoW
-//func (b *Block) DeriveHash() {
-//info := bytes.Join([][]byte{b.Data, b.PrevHash}, []byte{})
-//hash := sha256.Sum256(info)
-//b.Hash = hash[:]
-//}
-
 // HashTransactions represent all transactions in a unique hash for PoW
 func (b *Block) HashTransactions() []byte {
 	var txHashes [][]byte
-	var txHash [32]byte
 
 	// add each transaction to the 2d slice
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.ID)
+		txHashes = append(txHashes, tx.Serialize())
 	}
 
-	// concat all the bytes together and hash them
-	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+	// create a merkle tree
+	tree := NewMerkleTree(txHashes)
 
-	return txHash[:]
+	// the root of the tree will serve as the unique identifier for each transaction
+	return tree.RootNode.Data
 
 }
 

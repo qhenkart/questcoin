@@ -78,7 +78,7 @@ func (u UTXOSet) Reindex() {
 			// decode the index into bytes
 			key, err := hex.DecodeString(txID)
 			if err != nil {
-				return err
+				handle(err)
 			}
 			// add prefix
 			key = append(utxoPrefix, key...)

@@ -26,7 +26,7 @@ import (
 // a growing number of minors as well as the increase in computation power of computers in general
 //
 // the goal is to make the amount of time to mine a block to be about the same
-const Difficulty = 18
+const Difficulty = 12
 
 // ProofOfWork ...
 type ProofOfWork struct {
@@ -46,7 +46,7 @@ func NewProof(b *Block) *ProofOfWork {
 	return pow
 }
 
-// InitData ...
+// InitData takes the previous hash and the hashed transaction, combines them together
 func (pow *ProofOfWork) InitData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
