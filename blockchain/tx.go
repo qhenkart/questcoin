@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"encoding/gob"
 
 	"github.com/qhenkart/blockchain/wallet"
 )
@@ -14,6 +15,11 @@ type TxOutput struct {
 	//
 	// in BTC this is implemented in Script lang
 	PubKeyHash []byte
+}
+
+// TxOutputs defines a collection of outputs
+type TxOutputs struct {
+	Outputs []TxOutput
 }
 
 // TxInput refences to pevious outputs
@@ -56,4 +62,26 @@ func (out *TxOutput) Lock(address []byte) {
 // IsLockedWithKey checks if an output is locked with a provided key
 func (out *TxOutput) IsLockedWithKey(pubKeyHash []byte) bool {
 	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
+}
+
+// Serialize serializes a transaction into bytes
+func (outs TxOutputs) Serialize() []byte {
+	var buffer bytes.Buffer
+
+	encode := gob.NewEncoder(&buffer)
+	err := encode.Encode(outs)
+	handle(err)
+
+	return buffer.Bytes()
+}
+
+// DeserializeOutputs turns bytes into txoutputs
+func DeserializeOutputs(data []byte) TxOutputs {
+	var outputs TxOutputs
+
+	decode := gob.NewDecoder(bytes.NewReader(data))
+	err := decode.Decode(&outputs)
+	handle(err)
+
+	return outputs
 }

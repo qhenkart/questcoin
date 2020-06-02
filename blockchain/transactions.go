@@ -81,7 +81,7 @@ func CoinbaseTx(to, data string) *Transaction {
 // then iterate through all of the unused outputs and create new inputs for them.
 //
 // creates 2 new outputs. One is the amount being sent, the other is the amount not being sent
-func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction {
+func NewTransaction(from, to string, amount int, UTXO *UTXOSet) *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -91,7 +91,7 @@ func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction
 	pubKeyHash := wallet.PublicKeyHash(w.PublicKey)
 
 	// collect the accumulated total of coins and the output locations
-	acc, validOutputs := chain.FindSpendableOutputs(pubKeyHash, amount)
+	acc, validOutputs := UTXO.FindSpendableOutputs(pubKeyHash, amount)
 
 	// if there is not enough funds, panic
 	if acc < amount {
@@ -121,7 +121,7 @@ func NewTransaction(from, to string, amount int, chain *BlockChain) *Transaction
 	tx := Transaction{nil, inputs, outputs}
 	// the id is now equal to the hashed version of all transactions
 	tx.ID = tx.Hash()
-	chain.SignTransaction(&tx, w.PrivateKey)
+	UTXO.Blockchain.SignTransaction(&tx, w.PrivateKey)
 
 	return &tx
 }

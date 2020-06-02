@@ -21,9 +21,6 @@ const (
 )
 
 // BlockChain ...
-//type BlockChain struct {
-//Blocks []*Block
-//}
 type BlockChain struct {
 	LastHash []byte
 	Database *badger.DB
@@ -109,7 +106,7 @@ func Continue(address string) *BlockChain {
 // AddBlock adds a block to the block chain.
 // pulls the last hash from the database, creates a new block with the transaction history and the last hash
 // then adds the new block into the database and updates the lasthash key with the latest block
-func (chain *BlockChain) AddBlock(transactions []*Transaction) {
+func (chain *BlockChain) AddBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	err := chain.Database.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte("lh"))
@@ -136,6 +133,8 @@ func (chain *BlockChain) AddBlock(transactions []*Transaction) {
 	})
 
 	handle(err)
+
+	return newBlock
 }
 
 // Iterator creates an iterator for the blockchain. The chain iterates backwards
@@ -166,106 +165,59 @@ func (iter *Iterator) Next() *Block {
 	return b
 }
 
-// FindUnspentTransactions measuring outputs that have no input references then they are "unspent" tokens. By counting all of the
-// unspent outputs that are associated with a certain user, we can tell how many tokens a user owns
-func (chain *BlockChain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
-	var unspentTxs []Transaction
-
+// FindUTXO find all unspent transactions outputs and return a map of unspent transaction outputs organized by transaction id
+func (chain *BlockChain) FindUTXO() map[string]TxOutputs {
+	UTXO := make(map[string]TxOutputs)
 	spentTXOs := make(map[string][]int)
 
 	iter := chain.Iterator()
 
 	for {
+		// iterate through each block from reverse, starting with the very last unspent transactions and continueing up the chain
 		block := iter.Next()
-
-		// iterate through each transaction inside of a block
-		// encode each id into a hexadecimal string
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
 
-			// label so we can break just to this portion of the loop
 		Outputs:
+			// iterate through each output
 			for outIdx, out := range tx.Outputs {
-				// if the output is inside the map then iterate to find the matching index
+				// if a transaction id exists in the spent transactions array iterate through the indexes to see if there is a match
+				// if there is a match then we know it's a spent output and we can skip it
 				if spentTXOs[txID] != nil {
 					for _, spentOut := range spentTXOs[txID] {
-						// find the matching Id
 						if spentOut == outIdx {
 							continue Outputs
 						}
 					}
 				}
 
-				// check to see if the address can unlock the transaction
-				if out.IsLockedWithKey(pubKeyHash) {
-					unspentTxs = append(unspentTxs, *tx)
-				}
+				// take the entire map into the outs variable that matches the transaction id
+				outs := UTXO[txID]
+				// put each output into the txOutputs value of the map
+				outs.Outputs = append(outs.Outputs, out)
+				// put the updated TXoutputs back into the map
+				UTXO[txID] = outs
 			}
 
-			// skip coinbase transactions since they have no inputs
 			if !tx.IsCoinbase() {
-				// interate through the transactions inputs to find more outputs by input reference
 				for _, in := range tx.Inputs {
-					if in.UsesKey(pubKeyHash) {
-						inTxID := hex.EncodeToString(in.ID)
-						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Out)
-					}
+					inTxID := hex.EncodeToString(in.ID)
+					// inputs reference used outputs by index, so add inputs to the spentTXOs map so we can match them in the next (previous) block
+					spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Out)
 				}
 			}
 		}
-
-		// checks to see if the block is the genesis block
 		if len(block.PrevHash) == 0 {
 			break
 		}
 	}
-	return unspentTxs
-}
 
-// FindUTXO find all unspent transactions outputs for a single address (user)
-func (chain *BlockChain) FindUTXO(pubKeyHash []byte) []TxOutput {
-	var UTXOs []TxOutput
-	unspentTransactions := chain.FindUnspentTransactions(pubKeyHash)
-
-	for _, tx := range unspentTransactions {
-		for _, out := range tx.Outputs {
-			if out.IsLockedWithKey(pubKeyHash) {
-				UTXOs = append(UTXOs, out)
-			}
-		}
-	}
-	return UTXOs
-}
-
-// FindSpendableOutputs accumulates the total unspent outputs as well as their addresses to sent a specified amount
-func (chain *BlockChain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int, map[string][]int) {
-	unspentOuts := make(map[string][]int)
-	unspentTxs := chain.FindUnspentTransactions(pubKeyHash)
-	accumulated := 0
-
-Work:
-	for _, tx := range unspentTxs {
-		txID := hex.EncodeToString(tx.ID)
-
-		for outIdx, out := range tx.Outputs {
-			// make sure a transaction cannot be made where a user does not have enough tokens
-			if out.IsLockedWithKey(pubKeyHash) && accumulated < amount {
-				accumulated += out.Value
-				unspentOuts[txID] = append(unspentOuts[txID], outIdx)
-				// once there is enough accumulated, we can break out of the loop
-				if accumulated >= amount {
-					break Work
-				}
-			}
-		}
-	}
-
-	return accumulated, unspentOuts
+	return UTXO
 }
 
 // FindTransaction finds a transaction in the block chain
-func (bc *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
-	iter := bc.Iterator()
+func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
+	iter := chain.Iterator()
 
 	for {
 		block := iter.Next()
@@ -287,13 +239,13 @@ func (bc *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 	return Transaction{}, errors.New("Transaction does not exist")
 }
 
-// SignTransaction
-func (bc *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+// SignTransaction ...
+func (chain *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
 	prevTXs := make(map[string]Transaction)
 
 	for _, in := range tx.Inputs {
 		// add each previous transaction to the prvious transaction map
-		prevTX, err := bc.FindTransaction(in.ID)
+		prevTX, err := chain.FindTransaction(in.ID)
 		handle(err)
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
@@ -303,12 +255,12 @@ func (bc *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey)
 }
 
 // VerifyTransaction verifies each previous transaction
-func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+func (chain *BlockChain) VerifyTransaction(tx *Transaction) bool {
 	prevTXs := make(map[string]Transaction)
 
 	for _, in := range tx.Inputs {
 		// add each previous transaction to the prvious transaction map
-		prevTX, err := bc.FindTransaction(in.ID)
+		prevTX, err := chain.FindTransaction(in.ID)
 		handle(err)
 		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
