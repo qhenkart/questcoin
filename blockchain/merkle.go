@@ -1,6 +1,9 @@
 package blockchain
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+	"log"
+)
 
 // MerkleTree is a system to simplify the process of verifying a transaction exists inside of a block without requiring the entire blockchain to confirm it
 //
@@ -59,11 +62,6 @@ func NewMerkleNode(left, right *MerkleNode, data []byte) *MerkleNode {
 func NewMerkleTree(data [][]byte) *MerkleTree {
 	var nodes []MerkleNode
 
-	// make sure that the leafs will be even, otherwise duplicate the last one
-	if len(data)%2 != 0 {
-		data = append(data, data[len(data)-1])
-	}
-
 	// pass in the transaction data and create the first branches
 	//
 	// the first set of branches do not have left and right branches. Only data (see illustration)
@@ -72,23 +70,30 @@ func NewMerkleTree(data [][]byte) *MerkleTree {
 		nodes = append(nodes, *node)
 	}
 
+	if len(nodes) == 0 {
+		log.Panic("No merkel nodes")
+	}
 	// iterate through the nodes and connect them into the next branch
 
 	// each node represents 2 transactions, so we know i should be the length of the transactions divided by 2
-	for i := 0; i < len(data)/2; i++ {
+
+	for len(nodes) > 1 {
+		// make sure that the leafs will be even, otherwise duplicate the last one
+		if len(nodes)%2 != 0 {
+			nodes = append(nodes, nodes[len(nodes)-1])
+		}
+
 		// create an array to represent levels of branches
 		var level []MerkleNode
-		for j := 0; j < len(nodes); j += 2 {
-			// left value will be j and right will be j+1
-			node := NewMerkleNode(&nodes[j], &nodes[j+1], nil)
+		for i := 0; i < len(nodes); i += 2 {
+			// left value will be i and right will be i+1
+			node := NewMerkleNode(&nodes[i], &nodes[i+1], nil)
 			// add the node to the branch level
 			level = append(level, *node)
 		}
-
 		// each iteration increases the level of nodes we are creating. Therefore each level would have half the amount of nodes as the previous level
 		nodes = level
 	}
-
 	// pass the only node of the final iteration to be the root
 	tree := MerkleTree{&nodes[0]}
 

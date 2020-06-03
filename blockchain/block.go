@@ -4,14 +4,22 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+	"time"
 )
 
-// Block ...
+// Block represents a block on the blockchain. Including the Transactions, prev hash, current hash and nonce
+//
+// different peers will have different copies of these blocks.
 type Block struct {
+	Timestamp int64
+	// current hash data block
 	Hash         []byte
 	Transactions []*Transaction
-	PrevHash     []byte
-	Nonce        int
+	// a hash that represents all of the previous blocks
+	PrevHash []byte
+	Nonce    int
+	// index of the block in the chain, important for comparing blockchains with other peers
+	Height int
 }
 
 // HashTransactions represent all transactions in a unique hash for PoW
@@ -31,9 +39,9 @@ func (b *Block) HashTransactions() []byte {
 
 }
 
-// CreateBlock ...
-func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
-	block := &Block{[]byte{}, txs, prevHash, 0}
+// CreateBlock creates a block
+func CreateBlock(txs []*Transaction, prevHash []byte, height int) *Block {
+	block := &Block{time.Now().Unix(), []byte{}, txs, prevHash, 0, height}
 	pow := NewProof(block)
 	nonce, hash := pow.Run()
 
@@ -43,9 +51,10 @@ func CreateBlock(txs []*Transaction, prevHash []byte) *Block {
 	return block
 }
 
-// Genesis ...
+// Genesis creates the very first block in the blockchain. The genesis block will not have a previous data hash
 func Genesis(coinbase *Transaction) *Block {
-	return CreateBlock([]*Transaction{coinbase}, []byte{})
+	// height of the genesis block is always zero
+	return CreateBlock([]*Transaction{coinbase}, []byte{}, 0)
 }
 
 // Serialize ...
@@ -59,7 +68,7 @@ func (b *Block) Serialize() []byte {
 	return res.Bytes()
 }
 
-// Deserialize ..
+// Deserialize deserializes bytes into a block
 func Deserialize(data []byte) *Block {
 	var b Block
 
