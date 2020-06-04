@@ -42,9 +42,11 @@ func (b *Block) HashTransactions() []byte {
 // CreateBlock creates a block
 func CreateBlock(txs []*Transaction, prevHash []byte, height int) *Block {
 	block := &Block{time.Now().Unix(), []byte{}, txs, prevHash, 0, height}
+	// creates a new proof of work
 	pow := NewProof(block)
 	nonce, hash := pow.Run()
 
+	// save the hash in the block
 	block.Hash = hash[:]
 	block.Nonce = nonce
 
@@ -57,7 +59,7 @@ func Genesis(coinbase *Transaction) *Block {
 	return CreateBlock([]*Transaction{coinbase}, []byte{}, 0)
 }
 
-// Serialize ...
+// Serialize turns a block into bytes
 func (b *Block) Serialize() []byte {
 	var res bytes.Buffer
 	encoder := gob.NewEncoder(&res)

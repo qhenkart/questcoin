@@ -73,14 +73,14 @@ func (cli *CommandLine) startNode(nodeID, minerAddress string) {
 	network.StartServer(nodeID, minerAddress)
 }
 
-func (cli *CommandLine) createBlockChain(address, nodeID string) {
+func (cli *CommandLine) createBlockchain(address, nodeID string) {
 	if !wallet.ValidateAddress(address) {
 		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.Init(address, nodeID)
 	defer chain.Database.Close()
 
-	UTXOSet := blockchain.UTXOSet{Blockchain: chain}
+	UTXOSet := blockchain.NewUTXOSet(chain)
 	UTXOSet.Reindex()
 
 	fmt.Println("block chain created")
@@ -91,7 +91,7 @@ func (cli *CommandLine) getBalance(address, nodeID string) {
 		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.Continue(nodeID)
-	UTXOSet := blockchain.UTXOSet{Blockchain: chain}
+	UTXOSet := blockchain.NewUTXOSet(chain)
 	defer chain.Database.Close()
 
 	balance := 0
@@ -109,7 +109,7 @@ func (cli *CommandLine) getBalance(address, nodeID string) {
 func (cli *CommandLine) reindexUTXO(nodeID string) {
 	chain := blockchain.Continue(nodeID)
 	defer chain.Database.Close()
-	UTXOSet := blockchain.UTXOSet{Blockchain: chain}
+	UTXOSet := blockchain.NewUTXOSet(chain)
 	UTXOSet.Reindex()
 
 	count := UTXOSet.CountTransactions()
@@ -141,7 +141,7 @@ func (cli *CommandLine) send(from, to string, amount int, nodeID string, mineNow
 		log.Panic("Address is not Valid")
 	}
 	chain := blockchain.Continue(nodeID)
-	UTXOSet := blockchain.UTXOSet{Blockchain: chain}
+	UTXOSet := blockchain.NewUTXOSet(chain)
 	defer chain.Database.Close()
 
 	wallets, err := wallet.CreateWallets(nodeID)
@@ -151,7 +151,7 @@ func (cli *CommandLine) send(from, to string, amount int, nodeID string, mineNow
 
 	wallet := wallets.GetWallet(from)
 
-	tx := blockchain.NewTransaction(&wallet, to, amount, &UTXOSet)
+	tx := blockchain.NewTransaction(&wallet, to, amount, UTXOSet)
 
 	// if mine is true, then a coinbase transaction is required
 	if mineNow {
@@ -259,7 +259,7 @@ func (cli *CommandLine) Run() {
 			createBlockchainCmd.Usage()
 			runtime.Goexit()
 		}
-		cli.createBlockChain(*createBlockchainAddress, nodeID)
+		cli.createBlockchain(*createBlockchainAddress, nodeID)
 	}
 
 	if printChainCmd.Parsed() {

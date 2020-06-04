@@ -21,8 +21,8 @@ const (
 	genesisData = "First Transaction from Genesis"
 )
 
-// BlockChain defines the blockchain and database access for the node
-type BlockChain struct {
+// Blockchain defines the blockchain and database access for the node
+type Blockchain struct {
 	LastHash []byte
 	Database *badger.DB
 }
@@ -39,7 +39,7 @@ func dbExists(path string) bool {
 // Init Initializes the database,
 //
 // initializes the blockchain with the first genesis block and first coinbase transaction
-func Init(address, nodeID string) *BlockChain {
+func Init(address, nodeID string) *Blockchain {
 	path := fmt.Sprintf(dbPath, nodeID)
 
 	if dbExists(path) {
@@ -71,12 +71,12 @@ func Init(address, nodeID string) *BlockChain {
 	handle(err)
 
 	//create new block chain in memory
-	blockchain := BlockChain{lastHash, db}
+	blockchain := Blockchain{lastHash, db}
 	return &blockchain
 }
 
 // Continue continues the blockchain when the coinbase and genesis have already been initialized
-func Continue(nodeID string) *BlockChain {
+func Continue(nodeID string) *Blockchain {
 	path := fmt.Sprintf(dbPath, nodeID)
 	if !dbExists(path) {
 		fmt.Println("No existing blockchain found, must be initialized first ")
@@ -96,12 +96,12 @@ func Continue(nodeID string) *BlockChain {
 		return nil
 	})
 
-	chain := BlockChain{lastHash, db}
+	chain := Blockchain{lastHash, db}
 	return &chain
 }
 
 // GetBestHeight retrieves the last (best) height
-func (chain *BlockChain) GetBestHeight() int {
+func (chain *Blockchain) GetBestHeight() int {
 	var lastBlock Block
 
 	err := chain.Database.View(func(txn *badger.Txn) error {
@@ -126,7 +126,7 @@ func (chain *BlockChain) GetBestHeight() int {
 }
 
 // GetBlock retrieves a block based on a block hash from the blockchain
-func (chain *BlockChain) GetBlock(blockHash []byte) (Block, error) {
+func (chain *Blockchain) GetBlock(blockHash []byte) (Block, error) {
 	var block Block
 
 	if err := chain.Database.View(func(txn *badger.Txn) error {
@@ -148,7 +148,7 @@ func (chain *BlockChain) GetBlock(blockHash []byte) (Block, error) {
 }
 
 // GetBlockHashes retrieves all of the block hashes from the blockchain
-func (chain *BlockChain) GetBlockHashes() [][]byte {
+func (chain *Blockchain) GetBlockHashes() [][]byte {
 	var blocks [][]byte
 
 	iter := chain.Iterator()
@@ -168,7 +168,7 @@ func (chain *BlockChain) GetBlockHashes() [][]byte {
 }
 
 // AddBlock takes a block ptr and adds it to the blockchain if it doesn't already exist
-func (chain *BlockChain) AddBlock(block *Block) {
+func (chain *Blockchain) AddBlock(block *Block) {
 	err := chain.Database.Update(func(txn *badger.Txn) error {
 		// if the block is already in the db, skip
 		if _, err := txn.Get(block.Hash); err == nil {
@@ -208,7 +208,7 @@ func (chain *BlockChain) AddBlock(block *Block) {
 // MineBlock adds a block to the block chain.
 // pulls the last hash from the database, creates a new block with the transaction history and the last hash
 // then adds the new block into the database and updates the lasthash key with the latest block
-func (chain *BlockChain) MineBlock(transactions []*Transaction) *Block {
+func (chain *Blockchain) MineBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	var lastHeight int
 
@@ -259,7 +259,7 @@ func (chain *BlockChain) MineBlock(transactions []*Transaction) *Block {
 }
 
 // FindUTXO find all unspent transactions outputs and return a map of unspent transaction outputs organized by transaction id
-func (chain *BlockChain) FindUTXO() map[string]TxOutputs {
+func (chain *Blockchain) FindUTXO() map[string]TxOutputs {
 	UTXO := make(map[string]TxOutputs)
 	spentTXOs := make(map[string][]int)
 
@@ -309,7 +309,7 @@ func (chain *BlockChain) FindUTXO() map[string]TxOutputs {
 }
 
 // FindTransaction finds a transaction in the block chain
-func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
+func (chain *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 	iter := chain.Iterator()
 
 	for {
@@ -332,8 +332,8 @@ func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 	return Transaction{}, errors.New("Transaction does not exist")
 }
 
-// SignTransaction ...
-func (chain *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
+// SignTransaction takes a transaction, collects all tthe previous transactions and signs it
+func (chain *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) {
 	prevTXs := make(map[string]Transaction)
 
 	for _, in := range tx.Inputs {
@@ -348,7 +348,7 @@ func (chain *BlockChain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateK
 }
 
 // VerifyTransaction verifies each previous transaction
-func (chain *BlockChain) VerifyTransaction(tx *Transaction) bool {
+func (chain *Blockchain) VerifyTransaction(tx *Transaction) bool {
 	if tx.IsCoinbase() {
 		return true
 	}

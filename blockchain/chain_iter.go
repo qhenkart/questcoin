@@ -9,7 +9,7 @@ type Iterator struct {
 }
 
 // Iterator creates an iterator for the blockchain. The chain iterates backwards
-func (chain *BlockChain) Iterator() *Iterator {
+func (chain *Blockchain) Iterator() *Iterator {
 	return &Iterator{chain.LastHash, chain.Database}
 }
 

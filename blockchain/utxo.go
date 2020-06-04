@@ -16,9 +16,14 @@ var (
 
 // UTXOSet allows us to access the database connected to our blockchain
 //
-// we can create a new layer in our db that has just hte UTXOs (unspent transactions)
+// we can create a new layer in our db that has only UTXOs (unspent transactions)
 type UTXOSet struct {
-	Blockchain *BlockChain
+	Blockchain *Blockchain
+}
+
+// NewUTXOSet creates a new UTXO set connected to a blockchain
+func NewUTXOSet(chain *Blockchain) *UTXOSet {
+	return &UTXOSet{Blockchain: chain}
 }
 
 // FindSpendableOutputs accumulates the total unspent outputs as well as their addresses to sent a specified amount
